@@ -118,6 +118,44 @@ paths:
         '404':
           description: Book not found
 
+  /book-copies/revenues:
+    get:
+      summary: Revenue by book format
+      tags:
+        - BookCopies
+      description: >
+        Revenue grouped by format (POCHE, BROCHE, RELIE, CARTONNE) for a given period.
+        Returns per-format copies sold, revenue, avg unit price, and grand total.
+      parameters:
+        - name: period
+          in: query
+          required: true
+          schema:
+            type: string
+            enum: [monthly, yearly]
+          description: Aggregation period
+        - name: year
+          in: query
+          required: true
+          schema:
+            type: integer
+        - name: month
+          in: query
+          required: false
+          schema:
+            type: integer
+            default: 1
+          description: Required only when period=monthly
+      responses:
+        '200':
+          description: Revenue data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BookCopyRevenue'
+        '400':
+          description: Invalid period
+
   /books/{bookId}/copies:
     get:
       summary: List copies for a book
@@ -628,6 +666,48 @@ components:
     FormatType:
       type: string
       enum: [POCHE, BROCHE, RELIE, CARTONNE]
+
+    BookCopyRevenue:
+      type: object
+      required:
+        - period
+        - period_type
+        - details
+        - total
+      properties:
+        period:
+          type: string
+          description: 'e.g. "2026-07" for monthly, "2026" for yearly'
+        period_type:
+          type: string
+          enum: [MONTHLY, YEARLY]
+        details:
+          type: array
+          items:
+            $ref: '#/components/schemas/FormatRevenue'
+        total:
+          type: number
+          format: float
+
+    FormatRevenue:
+      type: object
+      required:
+        - format
+        - copies_sold
+        - revenue
+        - avg_unit_price
+      properties:
+        format:
+          type: string
+          enum: [POCHE, BROCHE, RELIE, CARTONNE]
+        copies_sold:
+          type: integer
+        revenue:
+          type: number
+          format: float
+        avg_unit_price:
+          type: number
+          format: float
 
     StockRequest:
       type: object
