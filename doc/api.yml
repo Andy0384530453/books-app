@@ -96,6 +96,30 @@ paths:
                 items:
                   $ref: '#/components/schemas/BookDetail'
 
+  /books/lookup/{isbn}:
+    get:
+      summary: Lookup book by ISBN
+      tags:
+        - Books
+      description: >
+        Searches OpenLibrary first, falls back to Google Books if not found.
+        Returns detailed book metadata or 404 if not found in either source.
+      parameters:
+        - name: isbn
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Book found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IsbnBookDetail'
+        '404':
+          description: Not found in OpenLibrary or Google Books
+
   /books/{bookId}:
     get:
       summary: Get book details
@@ -666,6 +690,34 @@ components:
     FormatType:
       type: string
       enum: [POCHE, BROCHE, RELIE, CARTONNE]
+
+    IsbnBookDetail:
+      type: object
+      required:
+        - isbn
+        - title
+      properties:
+        isbn:
+          type: string
+        title:
+          type: string
+        authors:
+          type: array
+          items:
+            type: string
+        publisher:
+          type: string
+        publish_date:
+          type: string
+        page_count:
+          type: integer
+        subjects:
+          type: array
+          items:
+            type: string
+        source:
+          type: string
+          enum: [OpenLibrary, GoogleBooks]
 
     BookCopyRevenue:
       type: object
