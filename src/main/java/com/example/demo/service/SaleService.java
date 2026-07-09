@@ -14,7 +14,6 @@ import com.example.demo.exception.BadRequestException;
 import com.example.demo.mapper.SaleMapper;
 import com.example.demo.repository.BookCopyRepository;
 import com.example.demo.repository.CustomerRepository;
-import com.example.demo.repository.SaleItemRepository;
 import com.example.demo.repository.SaleRepository;
 import com.example.demo.repository.StockMovementRepository;
 import java.time.Instant;
@@ -32,7 +31,6 @@ import org.springframework.transaction.annotation.Transactional;
 public class SaleService {
 
   private final SaleRepository saleRepository;
-  private final SaleItemRepository saleItemRepository;
   private final CustomerRepository customerRepository;
   private final BookCopyRepository bookCopyRepository;
   private final StockMovementRepository stockMovementRepository;
@@ -80,39 +78,27 @@ public class SaleService {
       requested.put(copyId, qty);
     }
 
-    // All stock checks passed — create the sale
+    // All stock checks passed — create and persist the sale first
+    UUID saleId = UUID.randomUUID();
     Sale sale =
         Sale.builder()
-            .idSale(UUID.randomUUID())
+            .idSale(saleId)
             .saleDate(Instant.now())
             .paymentStatus(PaymentStatus.PAID)
             .customer(customer)
             .items(new HashSet<>())
             .build();
 
+    // Build sale items and deduct stock
     Set<SaleItem> saleItems = new HashSet<>();
     for (SaleItemInput item : input.getItems()) {
       UUID copyId = UUID.fromString(item.getIdCopy());
       BookCopy copy = copies.get(copyId);
       int qty = requested.get(copyId);
 
-      // Deduct stock
       copy.setStock(copy.getStock() - qty);
       bookCopyRepository.save(copy);
 
-      // Record stock movement
-      stockMovementRepository.save(
-          StockMovement.builder()
-              .idMovement(UUID.randomUUID())
-              .bookCopy(copy)
-              .movementType(MovementType.OUT)
-              .movementDate(Instant.now())
-              .quantity(qty)
-              .sale(sale)
-              .reason("Sale")
-              .build());
-
-      // Create sale item with the effective price at time of sale
       SaleItem saleItem =
           SaleItem.builder()
               .idSaleItem(UUID.randomUUID())
@@ -126,7 +112,24 @@ public class SaleService {
 
     sale.setItems(saleItems);
     Sale saved = saleRepository.save(sale);
-    saleItemRepository.saveAll(saleItems);
+
+    // Record stock movements after sale is persisted
+    for (SaleItemInput item : input.getItems()) {
+      UUID copyId = UUID.fromString(item.getIdCopy());
+      BookCopy copy = copies.get(copyId);
+      int qty = requested.get(copyId);
+
+      stockMovementRepository.save(
+          StockMovement.builder()
+              .idMovement(UUID.randomUUID())
+              .bookCopy(copy)
+              .movementType(MovementType.OUT)
+              .movementDate(Instant.now())
+              .quantity(qty)
+              .sale(saved)
+              .reason("Sale")
+              .build());
+    }
 
     return saleMapper.toDetail(saved);
   }
